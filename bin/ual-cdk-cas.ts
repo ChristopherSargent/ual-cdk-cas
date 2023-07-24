@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { UalCdkCasStack } from '../lib/ual-cdk-cas-stack'; // Import the UalCdkCasStack construct
+import { UalCdkCasStack } from '../lib/ssm/ssm'; // Import the UalCdkCasStack construct from ssm.ts
 
 const app = new cdk.App();
 

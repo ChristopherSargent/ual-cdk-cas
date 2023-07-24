@@ -5,7 +5,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
 
 export interface SSMProps {
-  vpc: ec2.IVpc;
+  vpc: ec2.IVpc; // Update this type to IVpc
   encryptionKeyAlias: string;
 }
 
@@ -29,7 +29,7 @@ export class SSM extends Construct {
     // Requirement 3: Interface VPC Endpoints for SSM
     const ssmEndpoint = new ec2.InterfaceVpcEndpoint(this, 'SSMEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      vpc: props.vpc,
+      vpc: props.vpc, // Use IVpc from SSMProps
       // Other configuration for the endpoint, if needed
     });
 
@@ -58,14 +58,34 @@ export class SSM extends Construct {
       ssmRole.addToPolicy(ssmPolicy);
 
     // Requirement 6: Store sensitive variables/parameters in SSM as SecureString
-    const sensitiveEnvironmentVariable = ssm.StringParameter.fromSecureStringParameterAttributes(
-      this,
-      'SensitiveEnvironmentVariable',
-      {
-        parameterName: '/path/to/sensitive/environment-variable',
-        version: 1, // Specify the parameter version
-      }
-    );
+    const sensitiveEnvironmentVariable = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'SensitiveEnvironmentVariable', {
+      parameterName: '/path/to/sensitive/environment-variable',
+      version: 1, // Specify the parameter version
+    });
     // You can add more code to handle other requirements as needed
+  }
+}
+
+export class UalCdkCasStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props);
+
+    // Define your VPC for sensitive resources
+    const existingVpc = ec2.Vpc.fromLookup(this, 'ExistingVpc', {
+      vpcId: 'vpc-0e25f2478216c2dfa', // Replace with the appropriate VPC ID
+    });
+
+    // Enable VPC flow logs for the existing VPC
+    const flowLog = new ec2.FlowLog(this, 'VpcFlowLog', {
+      resourceType: ec2.FlowLogResourceType.fromVpc(existingVpc),
+      trafficType: ec2.FlowLogTrafficType.ALL,
+      destination: ec2.FlowLogDestination.toCloudWatchLogs(),
+    });
+
+    // Define your encryption key alias for SSM
+    const encryptionKeyAlias = 'alias/aws/ssm'; // Replace with the actual encryption key alias
+
+    // Create an instance of the SSM custom construct and add it to the stack
+    new SSM(this, 'SSMConstruct', { vpc: existingVpc, encryptionKeyAlias });
   }
 }
