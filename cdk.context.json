@@ -48,5 +48,17 @@
         ]
       }
     ]
-  }
+  },
+  "hosted-zone:account=507370583167:domainName=cas.sh:region=us-east-1": {
+    "Id": "/hostedzone/Z02121921778TTILNLBVT",
+    "Name": "cas.sh."
+  },
+  "availability-zones:account=507370583167:region=us-east-1": [
+    "us-east-1a",
+    "us-east-1b",
+    "us-east-1c",
+    "us-east-1d",
+    "us-east-1e",
+    "us-east-1f"
+  ]
 }

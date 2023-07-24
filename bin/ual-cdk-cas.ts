@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { UalCdkCasStack } from '../lib/ssm/ssm'; // Import the UalCdkCasStack construct from ssm.ts
+//import { UalCdkCasStack } from '../lib/ssm/ssm'; // Import the UalCdkCasStack construct from ssm.ts
+import { UalCdkCasStack } from '../lib/ual-cdk-cas-stack';
 
 const app = new cdk.App();
 
-const stack = new UalCdkCasStack(app, 'UalCdkCasStack', {
+new UalCdkCasStack(app, 'UalCdkCasStack', {
   // Provide any required configuration for the UalCdkCasStack here
   env: { account: '507370583167', region: 'us-east-1' },
 });

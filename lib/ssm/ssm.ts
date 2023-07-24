@@ -3,6 +3,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
+import { Port, SubnetType, Vpc, FlowLog, FlowLogDestination, FlowLogTrafficType, FlowLogResourceType } from 'aws-cdk-lib/aws-ec2';
 
 export interface SSMProps {
   vpc: ec2.IVpc; // Update this type to IVpc
@@ -81,6 +82,34 @@ export class UalCdkCasStack extends cdk.Stack {
       trafficType: ec2.FlowLogTrafficType.ALL,
       destination: ec2.FlowLogDestination.toCloudWatchLogs(),
     });
+
+        // Define your new VPC for sensitive resources
+        const newVpc = new Vpc(this, 'NewVPC', {
+            subnetConfiguration: [
+              {
+                cidrMask: 24,
+                name: 'ingress',
+                subnetType: SubnetType.PUBLIC,
+              },
+              {
+                cidrMask: 24,
+                name: 'compute',
+                subnetType: SubnetType.PRIVATE_WITH_NAT,
+              },
+              {
+                cidrMask: 28,
+                name: 'rds',
+                subnetType: SubnetType.PRIVATE_ISOLATED,
+              },
+            ],
+          });
+      
+          // Enable VPC flow logs for the new VPC
+          const flowLogNewVpc = new FlowLog(this, 'VpcFlowLogNew', {
+            resourceType: FlowLogResourceType.fromVpc(newVpc),
+            trafficType: FlowLogTrafficType.ALL,
+            destination: FlowLogDestination.toCloudWatchLogs(),
+          });
 
     // Define your encryption key alias for SSM
     const encryptionKeyAlias = 'alias/aws/ssm'; // Replace with the actual encryption key alias

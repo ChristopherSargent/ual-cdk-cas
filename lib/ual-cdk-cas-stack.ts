@@ -1,30 +1,48 @@
-import * as cdk from 'aws-cdk-lib';
+import { Stack, StackProps } from 'aws-cdk-lib';
+import { Port, SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
-import { Vpc, FlowLog, FlowLogDestination, FlowLogTrafficType, FlowLogResourceType } from 'aws-cdk-lib/aws-ec2';
+import { ACM } from './acm/acm';
 import { SSM } from './ssm/ssm';
+import { Route53 } from './route53/route53';
 
-export class UalCdkCasStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
-    super(scope, id, props);
 
-    // Define your VPC for sensitive resources
-    const existingVpc = Vpc.fromLookup(this, 'ExistingVpc', {
-      vpcId: 'vpc-0e25f2478216c2dfa', // Replace with the appropriate VPC ID
-    });
+//export declare class UalCdkCasStack extends Stack {
 
-    // Enable VPC flow logs for the existing VPC
-    const flowLog = new FlowLog(this, 'VpcFlowLog', {
-      resourceType: FlowLogResourceType.fromVpc(existingVpc),
-      trafficType: FlowLogTrafficType.ALL,
-      destination: FlowLogDestination.toCloudWatchLogs(),
-    });
+export class UalCdkCasStack extends Stack {
+  public readonly acm: ACM;
+  public readonly ssm: SSM;
+  public readonly route53: Route53;
+  public readonly vpc: Vpc;
 
-    // Define your encryption key alias for SSM
-    const encryptionKeyAlias = 'alias/aws/ssm'; // Replace with the actual encryption key alias
+    //constructor(scope: Construct, id: string, props?: StackProps);
+    constructor(scope: Construct, id: string, props?: StackProps) {
+      super(scope, id, props);
+    
+      this.route53 = new Route53(this, 'Route53');
 
-    // Create an instance of the SSM custom construct and add it to the stack
-    new SSM(this, 'SSMConstruct', { vpc: existingVpc, encryptionKeyAlias });
-
-    // Optionally, you can add more constructs or resources to the stack as needed
+      this.acm = new ACM(this, 'ACM', {
+        hosted_zone: this.route53.hosted_zone,
+      });
+  
+      this.vpc = new Vpc(this, 'MyVPC', {
+        subnetConfiguration: [
+          {
+            cidrMask: 24,
+            name: 'ingress',
+            subnetType: SubnetType.PUBLIC,
+          },
+          {
+            cidrMask: 24,
+            name: 'compute',
+            subnetType: SubnetType.PRIVATE_WITH_NAT,
+          },
+          {
+            cidrMask: 28,
+            name: 'rds',
+            subnetType: SubnetType.PRIVATE_ISOLATED,
+          },
+        ],
+      });
+  
   }
 }
