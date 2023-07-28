@@ -37,288 +37,599 @@ v18.16.1
 # Install ual-cdk-cas
 1. ssh cas@172.18.0.193
 2. sudo -i
-3. cd /home/cas/ual-cdk-cas && cdk init app --language typescript
-4. vim bin/ual-cdk-cas.ts
-* 
+3. cd /home/cas/ual-cdk-cas && checkout -b v125923_branch01
+4. npm install
+5. cdk synth
 ```
-#!/usr/bin/env node
-import 'source-map-support/register';
-import * as cdk from 'aws-cdk-lib';
-import { UalCdkCasStack } from '../lib/ual-cdk-cas-stack'; // Import the UalCdkCasStack construct
-
-const app = new cdk.App();
-
-const stack = new UalCdkCasStack(app, 'UalCdkCasStack', {
-  // Provide any required configuration for the UalCdkCasStack here
-  env: { account: '507370583167', region: 'us-east-1' },
-});
-
-// Optionally, you can add more constructs or resources to the stack as needed
-
-// Synthesize the AWS CDK app
-app.synth();
-
-```
-5. vim lib/ual-cdk-cas-stack
-* 
-```
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import { Vpc, FlowLog, FlowLogDestination, FlowLogTrafficType, FlowLogResourceType } from 'aws-cdk-lib/aws-ec2';
-import { SSM } from './ssm/ssm';
-
-export class UalCdkCasStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
-    super(scope, id, props);
-
-    // Define your VPC for sensitive resources
-    const existingVpc = Vpc.fromLookup(this, 'ExistingVpc', {
-      vpcId: 'vpc-0e25f2478216c2dfa', // Replace with the appropriate VPC ID
-    });
-
-    // Enable VPC flow logs for the existing VPC
-    const flowLog = new FlowLog(this, 'VpcFlowLog', {
-      resourceType: FlowLogResourceType.fromVpc(existingVpc),
-      trafficType: FlowLogTrafficType.ALL,
-      destination: FlowLogDestination.toCloudWatchLogs(),
-    });
-
-    // Define your encryption key alias for SSM
-    const encryptionKeyAlias = 'alias/aws/ssm'; // Replace with the actual encryption key alias
-
-    // Create an instance of the SSM custom construct and add it to the stack
-    new SSM(this, 'SSMConstruct', { vpc: existingVpc, encryptionKeyAlias });
-
-    // Optionally, you can add more constructs or resources to the stack as needed
-  }
-}
-```
-6. mkdir lib/ssm 
-7. vim lib/ssm/ssm.ts
-```
-import * as cdk from 'aws-cdk-lib';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import { Construct } from 'constructs';
-
-export interface SSMProps {
-  vpc: ec2.IVpc;
-  encryptionKeyAlias: string;
-}
-
-export class SSM extends Construct {
-  constructor(scope: Construct, id: string, props: SSMProps) {
-    super(scope, id);
-
-    // Requirement 1: Reference the existing SecureString parameter
-    const sensitiveParameter = ssm.StringParameter.fromSecureStringParameterAttributes(this, 'SensitiveParameter', {
-      parameterName: '/path/to/sensitive/parameter',
-      version: 1, // Specify the parameter version
-    });
-
-    // Requirement 2: Define AllowedValue and AllowedPattern for document parameters
-    const documentParameter = new ssm.StringParameter(this, 'DocumentParameter', {
-      parameterName: '/path/to/document/parameter',
-      stringValue: '123-45-6789',
-      allowedPattern: '^\\d{3}-\\d{2}-\\d{4}$',
-    });
-
-    // Requirement 3: Interface VPC Endpoints for SSM
-    const ssmEndpoint = new ec2.InterfaceVpcEndpoint(this, 'SSMEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      vpc: props.vpc,
-      // Other configuration for the endpoint, if needed
-    });
-
-    // Requirement 4: Least privilege access for administering SSM
-    const ssmRole = new iam.Role(this, 'SSMRole', {
-      assumedBy: new iam.ServicePrincipal('ssm.amazonaws.com'),
-    });
-    // Attach a policy with least privilege permissions for administering SSM
-    // Replace 'AmazonSSMFullAccess' with the appropriate policy based on your requirements
-    ssmRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMFullAccess'));
-
-    // Requirement 5: Restrict Session Manager users to Interactive Commands
-    const ssmPolicy = new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['ssm:StartSession'],
-        resources: ['*'],
-        conditions: {
-          StringEquals: {
-            'aws:RequestedRegion': 'us-west-2', // Replace with your desired region
-          },
-          Bool: {
-            'aws:DocumentRequireInteractive': true,
-          },
-        },
-      });
-      ssmRole.addToPolicy(ssmPolicy);
-
-    // Requirement 6: Store sensitive variables/parameters in SSM as SecureString
-    const sensitiveEnvironmentVariable = ssm.StringParameter.fromSecureStringParameterAttributes(
-      this,
-      'SensitiveEnvironmentVariable',
-      {
-        parameterName: '/path/to/sensitive/environment-variable',
-        version: 1, // Specify the parameter version
-      }
-    );
-    // You can add more code to handle other requirements as needed
-  }
-}
-```
-8. cdk synth
-```
+[WARNING] aws-cdk-lib.aws_ec2.SubnetType#PRIVATE_WITH_NAT is deprecated.
+  use `PRIVATE_WITH_EGRESS`
+  This API will be removed in the next major release.
 Resources:
-  VpcFlowLogIAMRoleB4DCB624:
-    Type: AWS::IAM::Role
+  Certificate4E7ABB08:
+    Type: AWS::CertificateManager::Certificate
     Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: vpc-flow-logs.amazonaws.com
-        Version: "2012-10-17"
+      DomainName: cas.sh
+      DomainValidationOptions:
+        - DomainName: cas.sh
+          HostedZoneId: Z02121921778TTILNLBVT
+      SubjectAlternativeNames:
+        - "*.cas.sh"
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/Certificate
+      ValidationMethod: DNS
     Metadata:
-      aws:cdk:path: UalCdkCasStack/VpcFlowLog/IAMRole/Resource
-  VpcFlowLogIAMRoleDefaultPolicy7533133B:
-    Type: AWS::IAM::Policy
+      aws:cdk:path: UalCdkCasStack/Certificate/Resource
+  MyVPCAFB07A31:
+    Type: AWS::EC2::VPC
     Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - logs:CreateLogStream
-              - logs:DescribeLogStreams
-              - logs:PutLogEvents
-            Effect: Allow
-            Resource:
-              Fn::GetAtt:
-                - VpcFlowLogLogGroupBB186289
-                - Arn
-          - Action: iam:PassRole
-            Effect: Allow
-            Resource:
-              Fn::GetAtt:
-                - VpcFlowLogIAMRoleB4DCB624
-                - Arn
-        Version: "2012-10-17"
-      PolicyName: VpcFlowLogIAMRoleDefaultPolicy7533133B
-      Roles:
-        - Ref: VpcFlowLogIAMRoleB4DCB624
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC
     Metadata:
-      aws:cdk:path: UalCdkCasStack/VpcFlowLog/IAMRole/DefaultPolicy/Resource
-  VpcFlowLogLogGroupBB186289:
-    Type: AWS::Logs::LogGroup
+      aws:cdk:path: UalCdkCasStack/MyVPC/Resource
+  MyVPCingressSubnet1Subnet826B3239:
+    Type: AWS::EC2::Subnet
     Properties:
-      RetentionInDays: 731
-    UpdateReplacePolicy: Retain
-    DeletionPolicy: Retain
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: ingress
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet1
+      VpcId:
+        Ref: MyVPCAFB07A31
     Metadata:
-      aws:cdk:path: UalCdkCasStack/VpcFlowLog/LogGroup/Resource
-  VpcFlowLogF72230C7:
-    Type: AWS::EC2::FlowLog
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet1/Subnet
+  MyVPCingressSubnet1RouteTableB42CFE20:
+    Type: AWS::EC2::RouteTable
     Properties:
-      DeliverLogsPermissionArn:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet1
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet1/RouteTable
+  MyVPCingressSubnet1RouteTableAssociationC24F338C:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCingressSubnet1RouteTableB42CFE20
+      SubnetId:
+        Ref: MyVPCingressSubnet1Subnet826B3239
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet1/RouteTableAssociation
+  MyVPCingressSubnet1DefaultRoute284CEB77:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: MyVPCIGW30AB6DD6
+      RouteTableId:
+        Ref: MyVPCingressSubnet1RouteTableB42CFE20
+    DependsOn:
+      - MyVPCVPCGWE6F260E1
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet1/DefaultRoute
+  MyVPCingressSubnet1EIPEFD3F682:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet1
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet1/EIP
+  MyVPCingressSubnet1NATGateway33681E44:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
         Fn::GetAtt:
-          - VpcFlowLogIAMRoleB4DCB624
+          - MyVPCingressSubnet1EIPEFD3F682
+          - AllocationId
+      SubnetId:
+        Ref: MyVPCingressSubnet1Subnet826B3239
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet1
+    DependsOn:
+      - MyVPCingressSubnet1DefaultRoute284CEB77
+      - MyVPCingressSubnet1RouteTableAssociationC24F338C
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet1/NATGateway
+  MyVPCingressSubnet2Subnet1C4FF535:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1b
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: ingress
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet2
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet2/Subnet
+  MyVPCingressSubnet2RouteTable9F8D47F4:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet2
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet2/RouteTable
+  MyVPCingressSubnet2RouteTableAssociation89A79312:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCingressSubnet2RouteTable9F8D47F4
+      SubnetId:
+        Ref: MyVPCingressSubnet2Subnet1C4FF535
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet2/RouteTableAssociation
+  MyVPCingressSubnet2DefaultRoute6FDE9456:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: MyVPCIGW30AB6DD6
+      RouteTableId:
+        Ref: MyVPCingressSubnet2RouteTable9F8D47F4
+    DependsOn:
+      - MyVPCVPCGWE6F260E1
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet2/DefaultRoute
+  MyVPCingressSubnet2EIP7F8C559A:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet2
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet2/EIP
+  MyVPCingressSubnet2NATGateway0DA97D15:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - MyVPCingressSubnet2EIP7F8C559A
+          - AllocationId
+      SubnetId:
+        Ref: MyVPCingressSubnet2Subnet1C4FF535
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet2
+    DependsOn:
+      - MyVPCingressSubnet2DefaultRoute6FDE9456
+      - MyVPCingressSubnet2RouteTableAssociation89A79312
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet2/NATGateway
+  MyVPCingressSubnet3Subnet01F7F4E4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1c
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: ingress
+        - Key: aws-cdk:subnet-type
+          Value: Public
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet3
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet3/Subnet
+  MyVPCingressSubnet3RouteTable5E2E1EA6:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet3
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet3/RouteTable
+  MyVPCingressSubnet3RouteTableAssociation2F73A846:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCingressSubnet3RouteTable5E2E1EA6
+      SubnetId:
+        Ref: MyVPCingressSubnet3Subnet01F7F4E4
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet3/RouteTableAssociation
+  MyVPCingressSubnet3DefaultRoute4724FC03:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: MyVPCIGW30AB6DD6
+      RouteTableId:
+        Ref: MyVPCingressSubnet3RouteTable5E2E1EA6
+    DependsOn:
+      - MyVPCVPCGWE6F260E1
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet3/DefaultRoute
+  MyVPCingressSubnet3EIPBF58E0CA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet3
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet3/EIP
+  MyVPCingressSubnet3NATGateway99FB4363:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - MyVPCingressSubnet3EIPBF58E0CA
+          - AllocationId
+      SubnetId:
+        Ref: MyVPCingressSubnet3Subnet01F7F4E4
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/ingressSubnet3
+    DependsOn:
+      - MyVPCingressSubnet3DefaultRoute4724FC03
+      - MyVPCingressSubnet3RouteTableAssociation2F73A846
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/ingressSubnet3/NATGateway
+  MyVPCcomputeSubnet1Subnet13EB6C6D:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.0.3.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: compute
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/computeSubnet1
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet1/Subnet
+  MyVPCcomputeSubnet1RouteTableE444B407:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/computeSubnet1
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet1/RouteTable
+  MyVPCcomputeSubnet1RouteTableAssociation545714D8:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCcomputeSubnet1RouteTableE444B407
+      SubnetId:
+        Ref: MyVPCcomputeSubnet1Subnet13EB6C6D
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet1/RouteTableAssociation
+  MyVPCcomputeSubnet1DefaultRoute3E741F04:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: MyVPCingressSubnet1NATGateway33681E44
+      RouteTableId:
+        Ref: MyVPCcomputeSubnet1RouteTableE444B407
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet1/DefaultRoute
+  MyVPCcomputeSubnet2SubnetC720E999:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1b
+      CidrBlock: 10.0.4.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: compute
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/computeSubnet2
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet2/Subnet
+  MyVPCcomputeSubnet2RouteTable7F9BBD0C:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/computeSubnet2
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet2/RouteTable
+  MyVPCcomputeSubnet2RouteTableAssociationAA4AF9CA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCcomputeSubnet2RouteTable7F9BBD0C
+      SubnetId:
+        Ref: MyVPCcomputeSubnet2SubnetC720E999
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet2/RouteTableAssociation
+  MyVPCcomputeSubnet2DefaultRouteF6E72A84:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: MyVPCingressSubnet2NATGateway0DA97D15
+      RouteTableId:
+        Ref: MyVPCcomputeSubnet2RouteTable7F9BBD0C
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet2/DefaultRoute
+  MyVPCcomputeSubnet3SubnetAD3DE84C:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1c
+      CidrBlock: 10.0.5.0/24
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: compute
+        - Key: aws-cdk:subnet-type
+          Value: Private
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/computeSubnet3
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet3/Subnet
+  MyVPCcomputeSubnet3RouteTable6C11E432:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/computeSubnet3
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet3/RouteTable
+  MyVPCcomputeSubnet3RouteTableAssociationB65CE417:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCcomputeSubnet3RouteTable6C11E432
+      SubnetId:
+        Ref: MyVPCcomputeSubnet3SubnetAD3DE84C
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet3/RouteTableAssociation
+  MyVPCcomputeSubnet3DefaultRoute5108908F:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: MyVPCingressSubnet3NATGateway99FB4363
+      RouteTableId:
+        Ref: MyVPCcomputeSubnet3RouteTable6C11E432
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/computeSubnet3/DefaultRoute
+  MyVPCrdsSubnet1Subnet923AFB93:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1a
+      CidrBlock: 10.0.6.0/28
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: rds
+        - Key: aws-cdk:subnet-type
+          Value: Isolated
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/rdsSubnet1
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet1/Subnet
+  MyVPCrdsSubnet1RouteTable63F43E5F:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/rdsSubnet1
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet1/RouteTable
+  MyVPCrdsSubnet1RouteTableAssociation30DA2878:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCrdsSubnet1RouteTable63F43E5F
+      SubnetId:
+        Ref: MyVPCrdsSubnet1Subnet923AFB93
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet1/RouteTableAssociation
+  MyVPCrdsSubnet2Subnet12A42E21:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1b
+      CidrBlock: 10.0.6.16/28
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: rds
+        - Key: aws-cdk:subnet-type
+          Value: Isolated
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/rdsSubnet2
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet2/Subnet
+  MyVPCrdsSubnet2RouteTable78F32F5A:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/rdsSubnet2
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet2/RouteTable
+  MyVPCrdsSubnet2RouteTableAssociationB51FD5B4:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCrdsSubnet2RouteTable78F32F5A
+      SubnetId:
+        Ref: MyVPCrdsSubnet2Subnet12A42E21
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet2/RouteTableAssociation
+  MyVPCrdsSubnet3Subnet3F66F75E:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-1c
+      CidrBlock: 10.0.6.32/28
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: aws-cdk:subnet-name
+          Value: rds
+        - Key: aws-cdk:subnet-type
+          Value: Isolated
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/rdsSubnet3
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet3/Subnet
+  MyVPCrdsSubnet3RouteTable24A0303E:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC/rdsSubnet3
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet3/RouteTable
+  MyVPCrdsSubnet3RouteTableAssociation650CFA8D:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: MyVPCrdsSubnet3RouteTable24A0303E
+      SubnetId:
+        Ref: MyVPCrdsSubnet3Subnet3F66F75E
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/rdsSubnet3/RouteTableAssociation
+  MyVPCIGW30AB6DD6:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: UalCdkCasStack/MyVPC
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/IGW
+  MyVPCVPCGWE6F260E1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: MyVPCIGW30AB6DD6
+      VpcId:
+        Ref: MyVPCAFB07A31
+    Metadata:
+      aws:cdk:path: UalCdkCasStack/MyVPC/VPCGW
+  MyVPCRestrictDefaultSecurityGroupCustomResourceC3FF5EE0:
+    Type: Custom::VpcRestrictDefaultSG
+    Properties:
+      ServiceToken:
+        Fn::GetAtt:
+          - CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E
           - Arn
-      LogDestinationType: cloud-watch-logs
-      LogGroupName:
-        Ref: VpcFlowLogLogGroupBB186289
-      ResourceId: vpc-0e25f2478216c2dfa
-      ResourceType: VPC
-      TrafficType: ALL
+      DefaultSecurityGroupId:
+        Fn::GetAtt:
+          - MyVPCAFB07A31
+          - DefaultSecurityGroup
+      Account: "507370583167"
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
     Metadata:
-      aws:cdk:path: UalCdkCasStack/VpcFlowLog/FlowLog
-  SSMConstructDocumentParameterED063CD5:
-    Type: AWS::SSM::Parameter
-    Properties:
-      AllowedPattern: ^\d{3}-\d{2}-\d{4}$
-      Name: /path/to/document/parameter
-      Type: String
-      Value: 123-45-6789
-    Metadata:
-      aws:cdk:path: UalCdkCasStack/SSMConstruct/DocumentParameter/Resource
-  SSMConstructSSMEndpointSecurityGroupD2BA8F5D:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: UalCdkCasStack/SSMConstruct/SSMEndpoint/SecurityGroup
-      SecurityGroupEgress:
-        - CidrIp: 0.0.0.0/0
-          Description: Allow all outbound traffic by default
-          IpProtocol: "-1"
-      SecurityGroupIngress:
-        - CidrIp: 172.31.0.0/16
-          Description: from 172.31.0.0/16:443
-          FromPort: 443
-          IpProtocol: tcp
-          ToPort: 443
-      VpcId: vpc-0e25f2478216c2dfa
-    Metadata:
-      aws:cdk:path: UalCdkCasStack/SSMConstruct/SSMEndpoint/SecurityGroup/Resource
-  SSMConstructSSMEndpoint90102B8E:
-    Type: AWS::EC2::VPCEndpoint
-    Properties:
-      PrivateDnsEnabled: true
-      SecurityGroupIds:
-        - Fn::GetAtt:
-            - SSMConstructSSMEndpointSecurityGroupD2BA8F5D
-            - GroupId
-      ServiceName: com.amazonaws.us-east-1.ssm
-      SubnetIds:
-        - subnet-0f174dc95909a8f41
-        - subnet-012bf401b47b837c4
-        - subnet-0a43904bfb9b97599
-        - subnet-0c853d2b9e6a834d6
-        - subnet-08f5c7674f490fedc
-        - subnet-09d154b1ede8f008e
-      VpcEndpointType: Interface
-      VpcId: vpc-0e25f2478216c2dfa
-    Metadata:
-      aws:cdk:path: UalCdkCasStack/SSMConstruct/SSMEndpoint/Resource
-  SSMConstructSSMRole0C7A81B7:
+      aws:cdk:path: UalCdkCasStack/MyVPC/RestrictDefaultSecurityGroupCustomResource/Default
+  CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
+        Version: "2012-10-17"
         Statement:
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
-              Service: ssm.amazonaws.com
-        Version: "2012-10-17"
+              Service: lambda.amazonaws.com
       ManagedPolicyArns:
-        - Fn::Join:
-            - ""
-            - - "arn:"
-              - Ref: AWS::Partition
-              - :iam::aws:policy/AmazonSSMFullAccess
+        - Fn::Sub: arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: Inline
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:RevokeSecurityGroupEgress
+                Resource:
+                  - Fn::Join:
+                      - ""
+                      - - arn:aws:ec2:us-east-1:507370583167:security-group/
+                        - Fn::GetAtt:
+                            - MyVPCAFB07A31
+                            - DefaultSecurityGroup
     Metadata:
-      aws:cdk:path: UalCdkCasStack/SSMConstruct/SSMRole/Resource
-  SSMConstructSSMRoleDefaultPolicy2BA91AC4:
-    Type: AWS::IAM::Policy
+      aws:cdk:path: UalCdkCasStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Role
+  CustomVpcRestrictDefaultSGCustomResourceProviderHandlerDC833E5E:
+    Type: AWS::Lambda::Function
     Properties:
-      PolicyDocument:
-        Statement:
-          - Action: ssm:StartSession
-            Condition:
-              StringEquals:
-                aws:RequestedRegion: us-west-2
-              Bool:
-                aws:DocumentRequireInteractive: true
-            Effect: Allow
-            Resource: "*"
-        Version: "2012-10-17"
-      PolicyName: SSMConstructSSMRoleDefaultPolicy2BA91AC4
-      Roles:
-        - Ref: SSMConstructSSMRole0C7A81B7
+      Code:
+        S3Bucket: cdk-hnb659fds-assets-507370583167-us-east-1
+        S3Key: e77031893275c08bcaa0a774aa8b611727afd045b3b5d8e1e6f0f04063d9d386.zip
+      Timeout: 900
+      MemorySize: 128
+      Handler: __entrypoint__.handler
+      Role:
+        Fn::GetAtt:
+          - CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0
+          - Arn
+      Runtime: nodejs16.x
+      Description: Lambda function for removing all inbound/outbound rules from the VPC default security group
+    DependsOn:
+      - CustomVpcRestrictDefaultSGCustomResourceProviderRole26592FE0
     Metadata:
-      aws:cdk:path: UalCdkCasStack/SSMConstruct/SSMRole/DefaultPolicy/Resource
+      aws:cdk:path: UalCdkCasStack/Custom::VpcRestrictDefaultSGCustomResourceProvider/Handler
+      aws:asset:path: asset.e77031893275c08bcaa0a774aa8b611727afd045b3b5d8e1e6f0f04063d9d386
+      aws:asset:property: Code
   CDKMetadata:
     Type: AWS::CDK::Metadata
     Properties:
-      Analytics: v2:deflate64:H4sIAAAAAAAA/2VPwQ6CMAz9Fu+jigfD3agx8UAw4WrmqKQ6VrINiVn27wKKF0997Xt9fV1DlsFqIXuXqOqRaLpCOHupHqJAx51VKAbuElCtIew19yeuxfZmZng0Hu1NKixbtTNVy2S8OKPqLPnXwXLXjuq/QZlvZ3UUJBsIBWscmanmrEm9xvaDotBcOwjDxZ/FjKNwrhlDWzJ1Lq1scIg07c5NjJPz96EoDFcId7d8phmkG0gXd0eU2M54ahCKT30DNuYjyhoBAAA=
+      Analytics: v2:deflate64:H4sIAAAAAAAA/1WQTWvDMAyGf0vvjrf0MHItYYxehklHr8VR1ExtYg9bTikh/3023eLtpEfvK/S1lVUlnzf65gvorsVArZwPrOEqGvQ2OEARvdMM6JjOBJpx1Eb36ORcZ03UZ/MnXQTCVs7HL0jGUdVChXYgOITWICctU2MD44duB8x61nbeWyDNZM1anOB1r1J41/wW5930XShHU8TceG8YXeTfgscmP9mO45GfIxpeFlEHz3ZcD05zVv5nKWcn6tCJuBZy/FNPpl+EsR3Ki3+aykqWL7LcXDxR4YJhGlE2j/gNEsKXMmoBAAA=
     Metadata:
       aws:cdk:path: UalCdkCasStack/CDKMetadata/Default
 Parameters:
@@ -340,12 +651,27 @@ Rules:
                 - Ref: BootstrapVersion
         AssertDescription: CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.
 ```
-9. cdk synth | regula run
+
+6. cdk synth | regula run
 ```
-No problems found. I knew you could do it.
+[WARNING] aws-cdk-lib.aws_ec2.SubnetType#PRIVATE_WITH_NAT is deprecated.
+  use `PRIVATE_WITH_EGRESS`
+  This API will be removed in the next major release.
+
+
+FG_R00054: VPC flow logging should be enabled [Medium]
+           https://docs.fugue.co/FG_R00054.html
+
+  [1]: MyVPCAFB07A31
+       in <stdin>:17:3
+
+Found one problem.
 ```
-10. cdk bootstrap
+7. cdk bootstrap
 ```
+[WARNING] aws-cdk-lib.aws_ec2.SubnetType#PRIVATE_WITH_NAT is deprecated.
+  use `PRIVATE_WITH_EGRESS`
+  This API will be removed in the next major release.
  ⏳  Bootstrapping environment aws://507370583167/us-east-1...
 Trusted accounts for deployment: (none)
 Trusted accounts for lookup: (none)
@@ -355,53 +681,9 @@ Using default execution policy of 'arn:aws:iam::aws:policy/AdministratorAccess'.
 
  ✅  Environment aws://507370583167/us-east-1 bootstrapped (no changes).
 ```
-11. cdk deploy 
+8. cdk deploy 
 ```
-✨  Synthesis time: 6.93s
 
-UalCdkCasStack:  start: Building c126734b3d7d2b67664ce45355fe976bf5671d3156f0d9c8c35eae2841414414:507370583167-us-east-1
-UalCdkCasStack:  success: Built c126734b3d7d2b67664ce45355fe976bf5671d3156f0d9c8c35eae2841414414:507370583167-us-east-1
-UalCdkCasStack:  start: Publishing c126734b3d7d2b67664ce45355fe976bf5671d3156f0d9c8c35eae2841414414:507370583167-us-east-1
-UalCdkCasStack:  success: Published c126734b3d7d2b67664ce45355fe976bf5671d3156f0d9c8c35eae2841414414:507370583167-us-east-1
-This deployment will make potentially sensitive changes according to your current security approval level (--require-approval broadening).
-Please confirm you intend to make the following modifications:
-
-IAM Statement Changes
-┌───┬─────────────────────────────┬────────┬──────────────────────────────────────────────────────────────┬─────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│   │ Resource                    │ Effect │ Action                                                       │ Principal                           │ Condition                                                                                                 │
-├───┼─────────────────────────────┼────────┼──────────────────────────────────────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ + │ ${SSMConstruct/SSMRole.Arn} │ Allow  │ sts:AssumeRole                                               │ Service:ssm.amazonaws.com           │                                                                                                           │
-├───┼─────────────────────────────┼────────┼──────────────────────────────────────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ + │ ${VpcFlowLog/IAMRole.Arn}   │ Allow  │ sts:AssumeRole                                               │ Service:vpc-flow-logs.amazonaws.com │                                                                                                           │
-│ + │ ${VpcFlowLog/IAMRole.Arn}   │ Allow  │ iam:PassRole                                                 │ AWS:${VpcFlowLog/IAMRole}           │                                                                                                           │
-├───┼─────────────────────────────┼────────┼──────────────────────────────────────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ + │ ${VpcFlowLog/LogGroup.Arn}  │ Allow  │ logs:CreateLogStream                                         │ AWS:${VpcFlowLog/IAMRole}           │                                                                                                           │
-│   │                             │        │ logs:DescribeLogStreams                                      │                                     │                                                                                                           │
-│   │                             │        │ logs:PutLogEvents                                            │                                     │                                                                                                           │
-├───┼─────────────────────────────┼────────┼──────────────────────────────────────────────────────────────┼─────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ + │ *                           │ Allow  │ ssm:StartSession                                             │ AWS:${SSMConstruct/SSMRole}         │ "StringEquals": {                                                                                         │
-│   │                             │        │                                                              │                                     │   "aws:RequestedRegion": "us-west-2"                                                                      │
-│   │                             │        │                                                              │                                     │ },                                                                                                        │
-│   │                             │        │                                                              │                                     │ "Bool": {                                                                                                 │
-│   │                             │        │                                                              │                                     │   "aws:DocumentRequireInteractive": true                                                                  │
-│   │                             │        │                                                              │                                     │ }                                                                                                         │
-└───┴─────────────────────────────┴────────┴──────────────────────────────────────────────────────────────┴─────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────────┘
-IAM Policy Changes
-┌───┬─────────────────────────┬───────────────────────────────────────────────────────────┐
-│   │ Resource                │ Managed Policy ARN                                        │
-├───┼─────────────────────────┼───────────────────────────────────────────────────────────┤
-│ + │ ${SSMConstruct/SSMRole} │ arn:${AWS::Partition}:iam::aws:policy/AmazonSSMFullAccess │
-└───┴─────────────────────────┴───────────────────────────────────────────────────────────┘
-Security Group Changes
-┌───┬───────────────────────────────────────────────────┬─────┬────────────┬─────────────────┐
-│   │ Group                                             │ Dir │ Protocol   │ Peer            │
-├───┼───────────────────────────────────────────────────┼─────┼────────────┼─────────────────┤
-│ + │ ${SSMConstruct/SSMEndpoint/SecurityGroup.GroupId} │ In  │ TCP 443    │ 172.31.0.0/16   │
-│ + │ ${SSMConstruct/SSMEndpoint/SecurityGroup.GroupId} │ Out │ Everything │ Everyone (IPv4) │
-└───┴───────────────────────────────────────────────────┴─────┴────────────┴─────────────────┘
-(NOTE: There may be security-related changes not in this list. See https://github.com/aws/aws-cdk/issues/1299)
-
-Do you wish to deploy these changes (y/n)?
 ```
 12. 
 
